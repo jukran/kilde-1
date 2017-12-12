@@ -1,0 +1,43 @@
+model{
+# This is a straightforward model for SA with allele data without genetic parameters.
+# The model has only multinomial-dirichlet parameters as such.  
+# Classification of the finite sample isolates is based on maximum membership probability (>threshold).
+
+##########################
+# posterior of allele frequencies (q***):# solved here analytically as dirichlet for each source population.
+# For simplicity, the whole set of allele types (from all sources) are used as a vector
+# of possible allele types [1:nat[j]] for each locus j = 1:7.
+# Prior for q*** is of the form: "Dir(1/n)" where "n" is the number of allele types (length of vector).
+
+for(lo in 1:7){prio[lo] <-  1/nat[lo]  # prior sample size for each type}
+
+for(i in 1:ns){   
+# ns = number of source populations
+qASP[i,1:nat[1]] ~ ddirich(ASPpar[i,])for(j in 1:nat[1]){  ASPpar[i,j] <- sourcesASP[i,j] + prio[1]; qASP.cut[i,j] <- cut(qASP[i,j])  }qGLN[i,1:nat[2]] ~ ddirich(GLNpar[i,])for(j in 1:nat[2]){  GLNpar[i,j] <- sourcesGLN[i,j] + prio[2]; qGLN.cut[i,j] <- cut(qGLN[i,j])  }qGLT[i,1:nat[3]] ~ ddirich(GLTpar[i,])for(j in 1:nat[3]){  GLTpar[i,j] <- sourcesGLT[i,j] + prio[3]; qGLT.cut[i,j] <- cut(qGLT[i,j])  }qGLY[i,1:nat[4]] ~ ddirich(GLYpar[i,])for(j in 1:nat[4]){  GLYpar[i,j] <- sourcesGLY[i,j] + prio[4]; qGLY.cut[i,j] <- cut(qGLY[i,j])  }qPGM[i,1:nat[5]] ~ ddirich(PGMpar[i,])for(j in 1:nat[5]){  PGMpar[i,j] <- sourcesPGM[i,j] + prio[5]; qPGM.cut[i,j] <- cut(qPGM[i,j])  }qTKT[i,1:nat[6]] ~ ddirich(TKTpar[i,])for(j in 1:nat[6]){  TKTpar[i,j] <- sourcesTKT[i,j] + prio[6]; qTKT.cut[i,j] <- cut(qTKT[i,j])  }qUNC[i,1:nat[7]] ~ ddirich(UNCpar[i,])for(j in 1:nat[7]){  UNCpar[i,j] <- sourcesUNC[i,j] + prio[7]; qUNC.cut[i,j] <- cut(qUNC[i,j])  }
+}
+# Human isolates: Z[n] = indicator for the underlying source for isolate n.
+for(n in 1:Nisolates){
+largest.value[n] <- ranked(pmembership[n,],ns)
+# attribute to a group only if P > threshold, otherwise attribute to the unknown group (=ns):
+Z[n] <- sum(whichsource[n,])*(1-step(threshold-largest.value[n]) ) + ns*step(threshold-largest.value[n]) 
+for(i in 1:ns){    
+whichsource[n,i] <- equals(largest.value[n],pmembership[n,i])*i  
+  # membership probabilities for each human isolate:    
+  pmembership[n,i] <- pmembership0[n,i]/sum(pmembership0[n,1:ns])     
+  pmembership0[n,i] <- exp( log(phi[i]) +                         
+                        log(qASP.cut[i,IASPtype[n]])+                         
+                        log(qGLN.cut[i,IGLNtype[n]])+                         
+                        log(qGLT.cut[i,IGLTtype[n]])+                         
+                        log(qGLY.cut[i,IGLYtype[n]])+                         
+                        log(qPGM.cut[i,IPGMtype[n]])+                         
+                        log(qTKT.cut[i,ITKTtype[n]])+                         
+                        log(qUNC.cut[i,IUNCtype[n]])  )    
+  S[n,i] <- equals(Z[n],i)   
+  }
+ }
+for(i in 1:ns){ 
+A[i] <- sum(S[,i]) + beta[i] 
+phi[i] <- phi0[i]/sum(phi0[1:ns])   # =dirichlet(A[1:ns])   
+phi0[i] ~ dgamma(A[i],1) 
+}  
+} # End of model
